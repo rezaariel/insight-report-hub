@@ -5,11 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, Loader2, Users } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, Users, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { UserManagement } from '@/components/admin/UserManagement';
 
 type DivisionKey = 'ga' | 'acc' | 'pcc' | 'hrd';
 type TableName = 'reports_ga' | 'reports_acc' | 'reports_pcc' | 'reports_hrd';
@@ -182,87 +184,106 @@ export default function AdminPanel() {
             Admin Panel
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Kelola dan ekspor laporan dari semua divisi
+            Kelola user dan ekspor laporan dari semua divisi
           </p>
         </div>
 
-        {/* Controls */}
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="w-full sm:w-64">
-            <Select
-              value={selectedDivision}
-              onValueChange={(value: DivisionKey) => setSelectedDivision(value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(divisionLabels).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Manajemen User
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Laporan
+            </TabsTrigger>
+          </TabsList>
 
-          <Button onClick={handleExport} disabled={exporting || loading}>
-            {exporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Export Excel
-          </Button>
-        </div>
+          <TabsContent value="users">
+            <UserManagement />
+          </TabsContent>
 
-        {/* Data Table */}
-        <div className="rounded-xl border bg-card">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <TabsContent value="reports">
+            {/* Controls */}
+            <div className="mb-6 flex flex-wrap items-center gap-4">
+              <div className="w-full sm:w-64">
+                <Select
+                  value={selectedDivision}
+                  onValueChange={(value: DivisionKey) => setSelectedDivision(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(divisionLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button onClick={handleExport} disabled={exporting || loading}>
+                {exporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Export Excel
+              </Button>
             </div>
-          ) : reports.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-lg font-medium text-foreground">
-                Belum ada laporan
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Laporan untuk {divisionLabels[selectedDivision]} belum tersedia
-              </p>
+
+            {/* Data Table */}
+            <div className="rounded-xl border bg-card">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : reports.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-4 text-lg font-medium text-foreground">
+                    Belum ada laporan
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Laporan untuk {divisionLabels[selectedDivision]} belum tersedia
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Periode</TableHead>
+                        <TableHead>Terakhir Diupdate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reports.map((report) => (
+                        <TableRow key={report.id}>
+                          <TableCell className="font-medium">
+                            {report.user_name}
+                          </TableCell>
+                          <TableCell>{report.user_email}</TableCell>
+                          <TableCell>{report.periode}</TableCell>
+                          <TableCell>
+                            {format(new Date(report.updated_at), 'd MMM yyyy, HH:mm', {
+                              locale: id,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Periode</TableHead>
-                    <TableHead>Terakhir Diupdate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium">
-                        {report.user_name}
-                      </TableCell>
-                      <TableCell>{report.user_email}</TableCell>
-                      <TableCell>{report.periode}</TableCell>
-                      <TableCell>
-                        {format(new Date(report.updated_at), 'd MMM yyyy, HH:mm', {
-                          locale: id,
-                        })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

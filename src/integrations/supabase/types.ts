@@ -305,6 +305,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      setup_initial_admin: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
