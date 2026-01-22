@@ -5,33 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ClipboardList, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ClipboardList, Eye, EyeOff, Loader2, Shield, User } from 'lucide-react';
 import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
   password: z.string().min(6, 'Password minimal 6 karakter'),
 });
 
-const signUpSchema = loginSchema.extend({
-  name: z.string().min(2, 'Nama minimal 2 karakter').max(100),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Password tidak cocok',
-  path: ['confirmPassword'],
-});
+type RoleType = 'admin' | 'user';
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedRole, setSelectedRole] = useState<RoleType>('user');
 
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -47,68 +40,34 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const result = loginSchema.safeParse({ email, password });
-        if (!result.success) {
-          const fieldErrors: Record<string, string> = {};
-          result.error.errors.forEach((err) => {
-            if (err.path[0]) {
-              fieldErrors[err.path[0].toString()] = err.message;
-            }
-          });
-          setErrors(fieldErrors);
-          setLoading(false);
-          return;
-        }
+      const result = loginSchema.safeParse({ email, password });
+      if (!result.success) {
+        const fieldErrors: Record<string, string> = {};
+        result.error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0].toString()] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+        setLoading(false);
+        return;
+      }
 
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({
-            title: 'Login Gagal',
-            description: error.message === 'Invalid login credentials' 
-              ? 'Email atau password salah' 
-              : error.message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Selamat Datang!',
-            description: 'Anda berhasil masuk ke SI-LAPOR',
-          });
-          navigate('/');
-        }
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast({
+          title: 'Login Gagal',
+          description: error.message === 'Invalid login credentials' 
+            ? 'Email atau password salah' 
+            : error.message,
+          variant: 'destructive',
+        });
       } else {
-        const result = signUpSchema.safeParse({ email, password, confirmPassword, name });
-        if (!result.success) {
-          const fieldErrors: Record<string, string> = {};
-          result.error.errors.forEach((err) => {
-            if (err.path[0]) {
-              fieldErrors[err.path[0].toString()] = err.message;
-            }
-          });
-          setErrors(fieldErrors);
-          setLoading(false);
-          return;
-        }
-
-        const { error } = await signUp(email, password, name);
-        if (error) {
-          toast({
-            title: 'Registrasi Gagal',
-            description: error.message.includes('already registered')
-              ? 'Email sudah terdaftar'
-              : error.message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Registrasi Berhasil',
-            description: 'Akun Anda telah dibuat. Silakan login.',
-          });
-          setIsLogin(true);
-          setPassword('');
-          setConfirmPassword('');
-        }
+        toast({
+          title: 'Selamat Datang!',
+          description: `Anda berhasil masuk sebagai ${selectedRole === 'admin' ? 'Admin' : 'User'}`,
+        });
+        navigate('/');
       }
     } catch (err) {
       toast({
@@ -154,34 +113,49 @@ export default function Auth() {
           </div>
 
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-foreground">
-              {isLogin ? 'Masuk ke Akun' : 'Buat Akun Baru'}
-            </h2>
+            <h2 className="text-2xl font-bold text-foreground">Masuk ke Akun</h2>
             <p className="text-muted-foreground mt-2">
-              {isLogin 
-                ? 'Masukkan kredensial Anda untuk melanjutkan' 
-                : 'Isi form di bawah untuk mendaftar'}
+              Pilih role dan masukkan kredensial Anda
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Lengkap</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Masukkan nama lengkap"
-                  className={errors.name ? 'border-destructive' : ''}
-                />
-                {errors.name && (
-                  <p className="text-xs text-destructive">{errors.name}</p>
+          {/* Role Selection */}
+          <div className="mb-6">
+            <Label className="text-sm font-medium mb-3 block">Masuk Sebagai</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedRole('user')}
+                className={cn(
+                  "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200",
+                  selectedRole === 'user'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border bg-card hover:border-primary/50 text-muted-foreground hover:text-foreground"
                 )}
-              </div>
-            )}
+              >
+                <User className="h-8 w-8 mb-2" />
+                <span className="font-medium">User</span>
+                <span className="text-xs opacity-70">Pengisi Laporan</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setSelectedRole('admin')}
+                className={cn(
+                  "flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200",
+                  selectedRole === 'admin'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border bg-card hover:border-primary/50 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Shield className="h-8 w-8 mb-2" />
+                <span className="font-medium">Admin</span>
+                <span className="text-xs opacity-70">Kelola Sistem</span>
+              </button>
+            </div>
+          </div>
 
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -189,7 +163,7 @@ export default function Auth() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@perusahaan.com"
+                placeholder={selectedRole === 'admin' ? 'admin@silapor.com' : 'nama@perusahaan.com'}
                 className={errors.email ? 'border-destructive' : ''}
               />
               {errors.email && (
@@ -221,42 +195,18 @@ export default function Auth() {
               )}
             </div>
 
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={errors.confirmPassword ? 'border-destructive' : ''}
-                />
-                {errors.confirmPassword && (
-                  <p className="text-xs text-destructive">{errors.confirmPassword}</p>
-                )}
-              </div>
-            )}
-
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? 'Masuk' : 'Daftar'}
+              Masuk sebagai {selectedRole === 'admin' ? 'Admin' : 'User'}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setErrors({});
-              }}
-              className="text-sm text-primary hover:underline"
-            >
-              {isLogin 
-                ? 'Belum punya akun? Daftar di sini' 
-                : 'Sudah punya akun? Masuk di sini'}
-            </button>
+          <div className="mt-6 p-4 rounded-lg bg-muted/50 border">
+            <p className="text-xs text-muted-foreground text-center">
+              {selectedRole === 'admin' 
+                ? 'Akun Admin memiliki akses untuk mengelola user dan melihat semua laporan.'
+                : 'Akun User dibuat oleh Admin. Hubungi Admin jika belum memiliki akun.'}
+            </p>
           </div>
         </div>
       </div>
